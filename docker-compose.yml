@@ -13,31 +13,5 @@ services:
     network_mode: host
     restart: unless-stopped
 
-  chat:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: nucleo-chat
-    environment:
-      # El chat guarda la conversacion y la reenvia completa: por eso se puede
-      # cambiar de modelo a mitad de charla sin perder el contexto.
-      OPENAI_API_BASE_URL: http://host.docker.internal:4000/v1
-      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
-      ENABLE_OLLAMA_API: "false"
-      WEBUI_AUTH: "false"
-      # Sin estas, Open WebUI lanza llamadas extra por cada mensaje (titulo,
-      # etiquetas, sugerencias) que en CPU saturan la maquina y todo se traba.
-      ENABLE_TITLE_GENERATION: "false"
-      ENABLE_TAGS_GENERATION: "false"
-      ENABLE_FOLLOW_UP_GENERATION: "false"
-      ENABLE_AUTOCOMPLETE_GENERATION: "false"
-      ENABLE_RETRIEVAL_QUERY_GENERATION: "false"
-    volumes:
-      - webui:/app/backend/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "127.0.0.1:3000:8080"
-    depends_on: [nucleo-ia]
-    restart: unless-stopped
-
-volumes:
-  webui:
+# El chat de pruebas es chat/index.html, servido aparte (ver arrancar.sh).
+# Open WebUI se probo y se quito: ver "Por que no Open WebUI" en CONTEXTO.md.

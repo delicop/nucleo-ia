@@ -5,7 +5,7 @@ directo a DeepSeek, OpenAI o Google. Por detrás puede haber modelos locales (Ol
 o modelos por API: cambiarlo no toca el código de los proyectos.
 
 ```
-Chat web (Open WebUI :3000)  ──┐
+Chat web (chat/ :8080)       ──┐
 Zuma / otros proyectos       ──┼──► Núcleo IA (LiteLLM :4000) ──► Ollama :11434
 curl / scripts               ──┘         claves · fallback · costos    (modelos locales)
 ```
@@ -24,7 +24,7 @@ El chat guarda la conversación y la reenvía completa en cada pregunta: por eso
 Qué modelo real hay detrás lo decide el archivo de configuración:
 
 - `config.yaml` → **PC de 48 GB**: qwen2.5:7b / qwen2.5:14b / qwen2.5vl:7b
-- `config-laptop.yaml` → **portátil**: qwen2.5:1.5b / qwen2.5:7b / moondream
+- `config-laptop.yaml` → **portátil**: qwen2.5:0.5b / qwen2.5:1.5b / moondream
 
 Se elige con `CONFIG_FILE` en el `.env`.
 
@@ -36,11 +36,15 @@ cp .env.example .env     # y poner una clave larga en LITELLM_MASTER_KEY
 ollama pull qwen2.5:7b && ollama pull qwen2.5:14b && ollama pull qwen2.5vl:7b
 sed -i 's/^CONFIG_FILE=.*/CONFIG_FILE=config.yaml/' .env
 
-docker compose up -d
+./arrancar.sh            # Ollama + gateway + chat, e imprime el link con la clave
 ```
 
-- Chat web: <http://localhost:3000>
+- Chat web: <http://localhost:8080/?key=...> (el link completo lo imprime `arrancar.sh`)
 - API: <http://localhost:4000>
+
+En el portátil conviene que Ollama tenga un solo modelo en memoria a la vez
+(`OLLAMA_MAX_LOADED_MODELS=1` en el servicio de Ollama) y apagar los contenedores de otros
+proyectos antes de probar: con 11 GB de RAM y 4 núcleos se satura enseguida.
 
 > El contenedor de LiteLLM usa la red del host para alcanzar el Ollama que escucha en
 > `127.0.0.1:11434`. Por eso no lleva `ports:`.
@@ -56,15 +60,15 @@ curl -sS http://127.0.0.1:4000/v1/chat/completions \
   -d '{"model":"zuma-rapido","messages":[{"role":"user","content":"Responde solo: funciono"}]}'
 ```
 
-Herramientas (lo que más falla con modelos chicos) y visión: ver `pruebas/` o los ejemplos
-en el doc de Zuma `docs/agentes/plataforma-ia.md`.
+Herramientas (lo que más falla con modelos chicos) y visión: ver los ejemplos en
+[docs/plataforma-ia.md](docs/plataforma-ia.md).
 
 ### Resultado de la primera prueba (portátil, sin GPU, 2026-09-22)
 
 | Prueba | Resultado |
 |---|---|
-| Texto (`zuma-rapido`, qwen2.5:1.5b) | ✅ Responde en 7,6 s |
-| Herramientas (`zuma-chat`, qwen2.5:7b) | ✅ Eligió `inventario_critico` con `limite: 10`; añadió texto de más |
+| Texto (`zuma-rapido`) | ✅ Responde en 7,6 s |
+| Herramientas (`zuma-chat`) | ✅ Eligió `inventario_critico` con `limite: 10`; añadió texto de más |
 | Visión (`zuma-vision`, moondream) | ✅ Leyó el banner, pero con errores y respondió en inglés |
 
 Conclusión: el circuito sirve. La calidad de estos modelos chicos **no** alcanza para
@@ -85,4 +89,4 @@ La visión de Zuma todavía tiene la URL fija en el código
 
 Cuando esto convenza, se alquila una **RTX A6000 de 48 GB** en RunPod (~0,33 USD/hora),
 se levanta **vLLM** en vez de Ollama y se apunta `api_base` allá. Los nombres de modelo y
-los proyectos no cambian. Detalle en `docs/agentes/ia-local.md` del repo de Zuma.
+los proyectos no cambian. Detalle en [docs/ia-local.md](docs/ia-local.md).

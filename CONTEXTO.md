@@ -27,6 +27,26 @@ modelos por API, y cambiarlos no toca el código de los proyectos.
 | GPU elegida | RTX A6000 48 GB en RunPod (~0,33 USD/h Community, ~0,53 USD/h Secure) |
 | Enrutador | Por reglas + escalada, NO un modelo que clasifique (ver abajo) |
 
+## Por qué no Open WebUI
+
+Se probó el 2026-09-22 (contenedor `nucleo-chat`). **Sí llegaba al gateway**: los logs de
+LiteLLM muestran sus peticiones con 200. Lo que falló fue todo lo demás:
+
+- **Pesa demasiado para el portátil:** la imagen ocupa 6,5 GB y el contenedor carga su propio
+  backend en Python, cuando la máquina ya estaba sin RAM libre.
+- **Hace llamadas extra por cada mensaje** (título, etiquetas, sugerencias, autocompletar). En
+  CPU cada una es otra respuesta del modelo en cola, y el chat parece colgado. Se apagaron con
+  variables `ENABLE_*_GENERATION=false`, pero Open WebUI guarda esa configuración en su base
+  la primera vez que arranca, así que las variables no siempre aplican después.
+- **Falló por dentro:** en el log aparece `KeyError: 'model'` al generar el título, y la
+  petición del chat terminó en `Server disconnected` / `Server Connection Error`.
+- En la segunda prueba pasó igual: la pregunta quedó más de un minuto esperando al gateway,
+  mientras el chat propio respondía en 1 s con el mismo modelo.
+
+El chat propio (`chat/index.html`) hace una sola llamada por mensaje, no pesa nada y muestra
+el error real cuando algo falla. Para un chat con marca de cara a clientes se puede volver a
+mirar Open WebUI o LibreChat, ya en un servidor con GPU.
+
 ## El enrutador (pendiente de construir)
 
 El proyecto pediría un solo modelo, `zuma`, y Núcleo IA decide:
@@ -100,3 +120,8 @@ Para retomar:
    GPU por horas.
 
 `./arrancar.sh` levanta todo e imprime el link del chat con la clave ya puesta.
+
+Actualización: el gateway y el CORS se verificaron bien (streaming en 0,6 s). El chat ahora
+muestra si falta la clave o si es rechazada, en vez de "sin conexión", y muestra los errores
+que llegan dentro del stream. Además había 12 contenedores de otros proyectos prendidos en el
+portátil: apagarlos antes de probar.

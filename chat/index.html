@@ -5,138 +5,448 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Núcleo IA</title>
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --texto:#e7e9ee; --suave:#9aa3b2; --acento:#22c55e; --borde:#262b36; }
+  :root {
+    --fondo:#171717; --lateral:#0d0d0d; --panel:#262626; --panel-2:#2f2f2f; --hover:#1f1f1f;
+    --texto:#ececec; --suave:#9b9b9b; --borde:#333; --acento:#22c55e; --error:#f87171;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --fondo:#ffffff; --lateral:#f7f7f8; --panel:#f4f4f4; --panel-2:#ececec; --hover:#ececec;
+      --texto:#1f1f1f; --suave:#6b6b6b; --borde:#e3e3e3; --acento:#16a34a; --error:#dc2626;
+    }
+  }
   * { box-sizing:border-box; }
-  body { margin:0; height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--texto);
-         font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  header { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--borde); flex-wrap:wrap; }
-  header b { font-weight:600; }
-  select, button { background:var(--panel); color:var(--texto); border:1px solid var(--borde); border-radius:8px; padding:8px 12px; font-size:14px; }
-  button { cursor:pointer; }
-  button:hover { border-color:var(--acento); }
-  #estado { color:var(--suave); font-size:13px; margin-left:auto; }
-  #hilo { flex:1; overflow-y:auto; padding:20px 16px; display:flex; flex-direction:column; gap:14px; }
-  .msg { max-width:760px; width:100%; margin:0 auto; display:flex; gap:10px; }
-  .quien { color:var(--suave); font-size:12px; min-width:80px; padding-top:3px; }
-  .texto { white-space:pre-wrap; flex:1; }
-  .yo .texto { background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:10px 12px; }
-  .meta { color:var(--suave); font-size:12px; margin-top:4px; }
-  form { display:flex; gap:10px; padding:14px 16px; border-top:1px solid var(--borde); }
-  textarea { flex:1; resize:none; background:var(--panel); color:var(--texto); border:1px solid var(--borde);
-             border-radius:10px; padding:10px 12px; font:inherit; min-height:48px; max-height:180px; }
-  .aviso { color:var(--suave); font-size:13px; text-align:center; padding:8px; }
+  html, body { height:100%; }
+  body { margin:0; display:flex; background:var(--fondo); color:var(--texto);
+         font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+
+  /* ---- barra lateral ---- */
+  #lateral { width:260px; flex:none; background:var(--lateral); display:flex; flex-direction:column; padding:10px; gap:6px; transition:margin .2s; }
+  body.sin-lateral #lateral { margin-left:-260px; }
+  .marca { display:flex; align-items:center; gap:10px; padding:6px 8px 10px; font-weight:600; }
+  .logo { width:26px; height:26px; border-radius:50%; background:var(--acento); color:#fff; display:grid; place-items:center; font-size:13px; font-weight:700; flex:none; }
+  .fila { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; width:100%; text-align:left; }
+  .fila:hover, .fila.activa { background:var(--hover); }
+  #lista { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:1px; margin-top:6px; }
+  .grupo { color:var(--suave); font-size:12px; padding:10px 10px 4px; }
+  .conv { font-size:14px; justify-content:space-between; }
+  .conv span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .conv .borrar { opacity:0; color:var(--suave); padding:0 2px; }
+  .conv:hover .borrar { opacity:1; }
+  #estado { color:var(--suave); font-size:12px; padding:8px 10px; border-top:1px solid var(--borde); display:flex; align-items:center; gap:8px; }
+  #estado::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--suave); flex:none; }
+  #estado.ok::before { background:var(--acento); }
+  #estado.mal::before { background:var(--error); }
+
+  /* ---- zona principal ---- */
+  main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  header { display:flex; align-items:center; gap:6px; padding:8px 12px; }
+  .icono { padding:8px; border-radius:8px; color:var(--suave); display:grid; place-items:center; }
+  .icono:hover { background:var(--hover); color:var(--texto); }
+  #modelo { appearance:none; background:transparent; color:var(--texto); border:0; font:inherit; font-size:17px; font-weight:600;
+            padding:6px 28px 6px 10px; border-radius:10px; cursor:pointer;
+            background-image:linear-gradient(45deg,transparent 50%,var(--suave) 50%),linear-gradient(135deg,var(--suave) 50%,transparent 50%);
+            background-position:calc(100% - 14px) 55%,calc(100% - 9px) 55%; background-size:5px 5px; background-repeat:no-repeat; }
+  #modelo:hover { background-color:var(--hover); }
+  #modelo option { background:var(--panel); color:var(--texto); font-size:14px; }
+
+  #hilo { flex:1; overflow-y:auto; padding:10px 16px 30px; }
+  .col { max-width:768px; margin:0 auto; }
+
+  .bienvenida { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px; padding-bottom:60px; }
+  .bienvenida .logo { width:52px; height:52px; font-size:22px; margin-bottom:10px; }
+  .bienvenida h1 { margin:0; font-size:26px; font-weight:600; }
+  .bienvenida p { margin:0; color:var(--suave); }
+  .sugerencias { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-top:26px; width:100%; max-width:680px; }
+  .sugerencias button { text-align:left; padding:12px 14px; border:1px solid var(--borde); border-radius:14px; color:var(--suave); font-size:14px; }
+  .sugerencias button:hover { background:var(--hover); color:var(--texto); }
+  .sugerencias b { display:block; color:var(--texto); font-weight:500; }
+
+  .msg { margin:22px auto; }
+  .msg.yo { display:flex; flex-direction:column; align-items:flex-end; }
+  .msg.yo .burbuja { background:var(--panel-2); padding:10px 16px; border-radius:22px; max-width:80%; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .foto-mini { max-width:220px; max-height:220px; border-radius:14px; margin-bottom:6px; display:block; }
+  .etiqueta-foto { font-size:12px; color:var(--suave); margin-bottom:4px; }
+  .ia { display:flex; gap:12px; }
+  .ia .logo { margin-top:2px; }
+  .ia-cuerpo { flex:1; min-width:0; }
+  .nombre { font-weight:600; font-size:14px; }
+  .nombre small { font-weight:400; color:var(--suave); margin-left:6px; }
+  .contenido { overflow-wrap:anywhere; }
+  .contenido > :first-child { margin-top:4px; }
+  .contenido p, .contenido ul, .contenido ol, .contenido pre, .contenido blockquote { margin:0 0 12px; }
+  .contenido ul, .contenido ol { padding-left:22px; }
+  .contenido h1, .contenido h2, .contenido h3 { margin:16px 0 8px; line-height:1.3; }
+  .contenido h1 { font-size:20px; } .contenido h2 { font-size:18px; } .contenido h3 { font-size:16px; }
+  .contenido code { background:var(--panel); padding:1px 5px; border-radius:5px; font-size:13.5px; }
+  .contenido pre { background:var(--lateral); border:1px solid var(--borde); border-radius:10px; padding:12px 14px; overflow-x:auto; }
+  .contenido pre code { background:none; padding:0; }
+  .contenido blockquote { border-left:3px solid var(--borde); padding-left:12px; color:var(--suave); }
+  .contenido a { color:var(--acento); }
+  .contenido.error { color:var(--error); }
+  .pensando { display:inline-flex; gap:4px; padding:10px 0; }
+  .pensando i { width:7px; height:7px; border-radius:50%; background:var(--suave); animation:salto 1.2s infinite; }
+  .pensando i:nth-child(2) { animation-delay:.15s; } .pensando i:nth-child(3) { animation-delay:.3s; }
+  @keyframes salto { 0%,80%,100% { opacity:.3; transform:translateY(0); } 40% { opacity:1; transform:translateY(-3px); } }
+  .acciones { display:flex; gap:2px; margin-top:2px; opacity:.7; }
+  .acciones .icono { padding:5px; }
+
+  /* ---- caja de escritura ---- */
+  .abajo { padding:0 16px 10px; }
+  #envio { background:var(--panel); border:1px solid var(--borde); border-radius:26px; padding:8px 8px 8px 10px; }
+  #adjunto { display:none; align-items:center; gap:8px; padding:4px 6px 8px; }
+  #adjunto img { width:48px; height:48px; object-fit:cover; border-radius:10px; }
+  #adjunto span { font-size:13px; color:var(--suave); }
+  .fila-envio { display:flex; align-items:flex-end; gap:6px; }
+  textarea { flex:1; resize:none; background:transparent; color:var(--texto); border:0; outline:none; font:inherit;
+             padding:8px 4px; max-height:200px; min-height:24px; }
+  #enviar { width:36px; height:36px; border-radius:50%; background:var(--texto); color:var(--fondo); display:grid; place-items:center; }
+  #enviar:disabled { opacity:.35; cursor:default; }
+  .pie { text-align:center; font-size:12px; color:var(--suave); padding-top:8px; }
+
+  @media (max-width: 800px) {
+    #lateral { position:fixed; inset:0 auto 0 0; z-index:5; box-shadow:0 0 30px rgba(0,0,0,.4); }
+    body:not(.sin-lateral) main::before { content:""; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:4; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <b>Núcleo IA</b>
-  <select id="modelo"></select>
-  <button id="limpiar" type="button">Nueva conversación</button>
-  <label class="aviso"><input type="checkbox" id="adjunto-lbl" hidden></label>
-  <input type="file" id="foto" accept="image/*" style="max-width:190px">
-  <span id="estado">conectando…</span>
-</header>
 
-<div id="hilo"></div>
-<div class="aviso">El historial se envía completo en cada pregunta: puedes cambiar de modelo a mitad de la charla sin perder el contexto.</div>
+<aside id="lateral">
+  <div class="marca"><div class="logo">N</div>Núcleo IA
+    <button class="icono" id="cerrar-lateral" title="Ocultar barra" style="margin-left:auto">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
+  </div>
+  <button class="fila" id="nueva">
+    <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    Nueva conversación
+  </button>
+  <div id="lista"></div>
+  <div id="estado">conectando…</div>
+</aside>
 
-<form id="envio">
-  <textarea id="entrada" placeholder="Escribe aquí… (Enter envía, Shift+Enter salta de línea)"></textarea>
-  <button type="submit">Enviar</button>
-</form>
+<main>
+  <header>
+    <button class="icono" id="abrir-lateral" title="Mostrar barra">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
+    <select id="modelo" title="Modelo"></select>
+  </header>
+
+  <div id="hilo"></div>
+
+  <div class="abajo">
+    <form id="envio" class="col">
+      <div id="adjunto"><img alt=""><span></span>
+        <button type="button" class="icono" id="quitar-foto" title="Quitar foto"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="fila-envio">
+        <button type="button" class="icono" id="clip" title="Adjuntar foto">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <input type="file" id="foto" accept="image/*" hidden>
+        <textarea id="entrada" rows="1" placeholder="Envía un mensaje"></textarea>
+        <button type="submit" id="enviar" title="Enviar" disabled>
+          <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </div>
+    </form>
+    <div class="pie">El historial se envía completo en cada pregunta: puedes cambiar de modelo a mitad de la charla.</div>
+  </div>
+</main>
 
 <script>
 const API = location.origin.replace(/:\d+$/, '') + ':4000';
-const CLAVE = new URLSearchParams(location.search).get('key') || localStorage.getItem('nucleo_key') || '';
-if (CLAVE) localStorage.setItem('nucleo_key', CLAVE);
+const guardado = {
+  leer(k, def) { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } },
+  poner(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const CLAVE = new URLSearchParams(location.search).get('key') || guardado.leer('nucleo_key', '');
+if (CLAVE) guardado.poner('nucleo_key', CLAVE);
 
 const $ = s => document.querySelector(s);
-const hilo = $('#hilo'), estado = $('#estado'), selModelo = $('#modelo');
-let mensajes = [];   // el contexto vive aqui: se manda completo cada vez
+const hilo = $('#hilo'), estado = $('#estado'), selModelo = $('#modelo'), entrada = $('#entrada'), btnEnviar = $('#enviar');
 
-function pinta(quien, texto, meta) {
-  const d = document.createElement('div');
-  d.className = 'msg' + (quien === 'Tú' ? ' yo' : '');
-  d.innerHTML = `<div class="quien">${quien}</div><div><div class="texto"></div>${meta ? `<div class="meta">${meta}</div>` : ''}</div>`;
-  d.querySelector('.texto').textContent = texto;
-  hilo.appendChild(d); hilo.scrollTop = hilo.scrollHeight;
-  return d.querySelector('.texto');
+const ICONO_ENVIAR = btnEnviar.innerHTML;
+const ICONO_PARAR = '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/></svg>';
+
+// Conversaciones guardadas en este navegador. Cada mensaje:
+// { role, content, modelo?, segundos?, foto? }. La foto nunca se guarda: solo se manda una vez.
+let convs = guardado.leer('nucleo_convs', []);
+let actual = null;            // conversación abierta
+let fotoPendiente = null;     // dataURL de la foto adjunta, si hay
+let controlador = null;       // AbortController de la respuesta en curso
+
+// Los modelos chicos suelen contestar "no puedo recordar conversaciones" aunque tengan el
+// historial delante; esto les recuerda que sí lo tienen.
+const SISTEMA = { role: 'system', content: 'Eres el asistente de Núcleo IA. Responde siempre en español. ' +
+  'Tienes delante toda la conversación anterior, aunque parte la haya respondido otro modelo: úsala para responder.' };
+
+// ---------- markdown mínimo ----------
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+function enLinea(t) {
+  return t
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+function markdown(texto) {
+  const partes = esc(texto).split(/```[^\n]*\n?/);
+  let html = '';
+  partes.forEach((p, i) => {
+    if (i % 2) { html += '<pre><code>' + p.replace(/\n$/, '') + '</code></pre>'; return; }
+    let lista = null, parrafo = [];
+    const cerrarParrafo = () => { if (parrafo.length) { html += '<p>' + enLinea(parrafo.join('<br>')) + '</p>'; parrafo = []; } };
+    const cerrarLista = () => { if (lista) { html += '</' + lista + '>'; lista = null; } };
+    for (const linea of p.split('\n')) {
+      let m;
+      if (!linea.trim()) { cerrarParrafo(); cerrarLista(); }
+      else if ((m = linea.match(/^(#{1,3})\s+(.*)/))) { cerrarParrafo(); cerrarLista(); html += `<h${m[1].length}>${enLinea(m[2])}</h${m[1].length}>`; }
+      else if ((m = linea.match(/^\s*(?:[-*•]|(\d+)[.)])\s+(.*)/))) {
+        cerrarParrafo();
+        const tipo = m[1] ? 'ol' : 'ul';
+        if (lista !== tipo) { cerrarLista(); html += '<' + tipo + '>'; lista = tipo; }
+        html += '<li>' + enLinea(m[2]) + '</li>';
+      }
+      else if ((m = linea.match(/^&gt;\s?(.*)/))) { cerrarParrafo(); cerrarLista(); html += '<blockquote>' + enLinea(m[1]) + '</blockquote>'; }
+      else { cerrarLista(); parrafo.push(linea); }
+    }
+    cerrarParrafo(); cerrarLista();
+  });
+  return html;
 }
 
+// ---------- pintar ----------
+function bienvenida() {
+  hilo.innerHTML = `
+    <div class="col bienvenida">
+      <div class="logo">N</div>
+      <h1>¿En qué te ayudo hoy?</h1>
+      <p>${esc(selModelo.value || 'Núcleo IA')}</p>
+      <div class="sugerencias">
+        <button data-p="Dame 3 ideas para reducir el desperdicio en la cocina de un restaurante"><b>Ideas para la cocina</b>reducir el desperdicio</button>
+        <button data-p="Explícame en palabras simples qué es el costo de receta"><b>Explícame</b>qué es el costo de receta</button>
+        <button data-p="Escribe un mensaje corto y amable para avisar a un proveedor que su pedido llegó incompleto"><b>Redacta un mensaje</b>para un proveedor</button>
+      </div>
+    </div>`;
+  hilo.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { entrada.value = b.dataset.p; ajustarAltura(); enviar(); });
+}
+
+function pintarUsuario(m, fotoUrl) {
+  const d = document.createElement('div');
+  d.className = 'msg yo col';
+  d.innerHTML = (fotoUrl ? `<img class="foto-mini" src="${fotoUrl}" alt="foto enviada">` : m.foto ? '<div class="etiqueta-foto">📷 foto enviada</div>' : '') +
+                (m.content ? '<div class="burbuja"></div>' : '');
+  if (m.content) d.querySelector('.burbuja').textContent = m.content;
+  hilo.appendChild(d);
+}
+
+function pintarIA(m) {
+  const d = document.createElement('div');
+  d.className = 'msg col ia';
+  d.innerHTML = `<div class="logo">N</div><div class="ia-cuerpo">
+      <div class="nombre">${esc(m.modelo || 'modelo')}<small></small></div>
+      <div class="contenido"></div>
+      <div class="acciones">
+        <button class="icono copiar" title="Copiar"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </div></div>`;
+  const acciones = d.querySelector('.acciones');
+  const vista = {
+    contenido: d.querySelector('.contenido'),
+    poner(texto) { this.contenido.classList.remove('error'); this.contenido.innerHTML = markdown(texto); },
+    pensando() { this.contenido.innerHTML = '<span class="pensando"><i></i><i></i><i></i></span>'; acciones.hidden = true; },
+    error(texto) { this.contenido.classList.add('error'); this.contenido.textContent = texto; acciones.hidden = true; },
+    meta(texto) { d.querySelector('small').textContent = texto; acciones.hidden = false; }
+  };
+  d.querySelector('.copiar').onclick = () => navigator.clipboard?.writeText(m.content || vista.contenido.innerText);
+  if (m.content) vista.poner(m.content);
+  if (m.segundos) vista.meta(m.segundos + ' s');
+  hilo.appendChild(d);
+  return vista;
+}
+
+function abajoDelTodo() { hilo.scrollTop = hilo.scrollHeight; }
+
+function abrir(conv) {
+  if (controlador) return;
+  actual = conv;
+  hilo.innerHTML = '';
+  if (!conv) { bienvenida(); pintarLista(); return; }
+  for (const m of conv.mensajes) m.role === 'user' ? pintarUsuario(m) : pintarIA(m);
+  if (conv.modelo && [...selModelo.options].some(o => o.value === conv.modelo)) selModelo.value = conv.modelo;
+  abajoDelTodo(); pintarLista();
+  if (innerWidth <= 800) document.body.classList.add('sin-lateral');
+}
+
+function pintarLista() {
+  const lista = $('#lista'); lista.innerHTML = '';
+  const hoy = new Date().toDateString();
+  let grupo = null;
+  for (const c of [...convs].sort((a, b) => b.fecha - a.fecha)) {
+    const g = new Date(c.fecha).toDateString() === hoy ? 'Hoy' : 'Anteriores';
+    if (g !== grupo) { grupo = g; lista.insertAdjacentHTML('beforeend', `<div class="grupo">${g}</div>`); }
+    const b = document.createElement('button');
+    b.className = 'fila conv' + (c === actual ? ' activa' : '');
+    b.innerHTML = '<span></span><span class="borrar" title="Borrar">✕</span>';
+    b.firstChild.textContent = c.titulo;
+    b.onclick = ev => {
+      if (ev.target.classList.contains('borrar')) {
+        if (controlador) return;
+        convs = convs.filter(x => x !== c); guardado.poner('nucleo_convs', convs);
+        if (c === actual) abrir(null); else pintarLista();
+        return;
+      }
+      abrir(c);
+    };
+    lista.appendChild(b);
+  }
+}
+
+// ---------- hablar con el gateway ----------
 async function cargarModelos() {
   try {
     const r = await fetch(API + '/v1/models', { headers: { Authorization: 'Bearer ' + CLAVE } });
+    if (r.status === 401 || r.status === 403) return malEstado(CLAVE ? 'clave rechazada: revisa ?key=' : 'falta la clave: abre con ?key=...');
+    if (!r.ok) return malEstado('el gateway respondió HTTP ' + r.status);
     const d = await r.json();
-    selModelo.innerHTML = d.data.map(m => `<option>${m.id}</option>`).join('');
-    estado.textContent = d.data.length + ' modelos · ' + API;
-  } catch (e) { estado.textContent = 'sin conexión con ' + API; }
+    const preferido = guardado.leer('nucleo_modelo', '');
+    selModelo.innerHTML = d.data.map(m => `<option>${esc(m.id)}</option>`).join('');
+    if (d.data.some(m => m.id === preferido)) selModelo.value = preferido;
+    estado.textContent = d.data.length + ' modelos · ' + API.replace(/^https?:\/\//, '');
+    estado.className = 'ok';
+    if (!actual) bienvenida();
+  } catch { malEstado('sin conexión con ' + API); }
 }
+function malEstado(t) { estado.textContent = t; estado.className = 'mal'; }
 
-async function preguntar(texto, imagenDataUrl) {
-  const contenido = imagenDataUrl
-    ? [{ type: 'text', text: texto || 'Describe en español qué ves.' }, { type: 'image_url', image_url: { url: imagenDataUrl } }]
-    : texto;
-  mensajes.push({ role: 'user', content: contenido });
-  pinta('Tú', texto + (imagenDataUrl ? ' [con foto]' : ''));
+async function enviar() {
+  const texto = entrada.value.trim();
+  if ((!texto && !fotoPendiente) || controlador || !selModelo.value) return;
+  const foto = fotoPendiente;
+  entrada.value = ''; quitarFoto();
 
+  if (!actual) {
+    actual = { id: Date.now(), titulo: (texto || 'Foto').slice(0, 48), fecha: Date.now(), mensajes: [] };
+    convs.push(actual);
+    hilo.innerHTML = '';
+  }
   const modelo = selModelo.value;
-  const salida = pinta(modelo, '', 'pensando…');
-  const t0 = performance.now();
+  actual.modelo = modelo; actual.fecha = Date.now();
 
+  const msgUsuario = { role: 'user', content: texto, foto: !!foto };
+  pintarUsuario(msgUsuario, foto);
+  const msgIA = { role: 'assistant', content: '', modelo };
+  const vista = pintarIA(msgIA);
+  vista.pensando(); abajoDelTodo(); pintarLista();
+
+  // La foto va solo en esta petición; en el historial queda como texto para no
+  // reenviar el base64 en cada pregunta ni mandárselo a modelos que no ven imágenes.
+  const comoTexto = m => m.foto ? (m.content || 'Describe en español qué ves.') + ' [el usuario envió una foto]' : m.content;
+  const historial = actual.mensajes.map(m => ({ role: m.role, content: m.role === 'user' ? comoTexto(m) : m.content }));
+  const contenido = foto
+    ? [{ type: 'text', text: texto || 'Describe en español qué ves.' }, { type: 'image_url', image_url: { url: foto } }]
+    : texto;
+
+  controlador = new AbortController();
+  modoParar(true);
+  const t0 = performance.now();
+  let completo = '';
   try {
     const r = await fetch(API + '/v1/chat/completions', {
-      method: 'POST',
+      method: 'POST', signal: controlador.signal,
       headers: { Authorization: 'Bearer ' + CLAVE, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modelo, messages: mensajes, stream: true })
+      body: JSON.stringify({ model: modelo, messages: [SISTEMA, ...historial, { role: 'user', content: contenido }], stream: true })
     });
     if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + (await r.text()).slice(0, 200));
 
     const lector = r.body.getReader(), dec = new TextDecoder();
-    let buffer = '', completo = '';
+    let buffer = '';
     while (true) {
       const { done, value } = await lector.read();
       if (done) break;
       buffer += dec.decode(value, { stream: true });
       const lineas = buffer.split('\n'); buffer = lineas.pop();
       for (const l of lineas) {
-        if (!l.startsWith('data: ') || l.includes('[DONE]')) continue;
-        try {
-          const trozo = JSON.parse(l.slice(6)).choices?.[0]?.delta?.content;
-          if (trozo) { completo += trozo; salida.textContent = completo; hilo.scrollTop = hilo.scrollHeight; }
-        } catch {}
+        if (!l.startsWith('data: ') || l.trim() === 'data: [DONE]') continue;
+        let dato;
+        try { dato = JSON.parse(l.slice(6)); } catch { continue; }
+        if (dato.error) throw new Error(dato.error.message || JSON.stringify(dato.error));
+        const trozo = dato.choices?.[0]?.delta?.content;
+        if (trozo) {
+          const pegado = hilo.scrollHeight - hilo.scrollTop - hilo.clientHeight < 80;
+          completo += trozo; vista.poner(completo);
+          if (pegado) abajoDelTodo();
+        }
       }
     }
-    mensajes.push({ role: 'assistant', content: completo });
-    salida.parentElement.querySelector('.meta').textContent =
-      modelo + ' · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
+    if (!completo) throw new Error('el modelo terminó sin devolver texto');
+    guardarRespuesta();
   } catch (e) {
-    salida.textContent = 'Error: ' + e.message;
-    salida.parentElement.querySelector('.meta').textContent = '';
-    mensajes.pop();
+    if (e.name === 'AbortError' && completo) { completo += ' …'; vista.poner(completo); guardarRespuesta(); }
+    else vista.error(e.name === 'AbortError' ? 'Detenido.' : 'Error: ' + e.message);
+  } finally {
+    controlador = null; modoParar(false); entrada.focus();
+  }
+
+  function guardarRespuesta() {
+    msgIA.content = completo;
+    msgIA.segundos = ((performance.now() - t0) / 1000).toFixed(1);
+    vista.meta(msgIA.segundos + ' s');
+    actual.mensajes.push(msgUsuario, msgIA);
+    guardado.poner('nucleo_convs', convs);
   }
 }
 
-$('#envio').addEventListener('submit', async ev => {
-  ev.preventDefault();
-  const texto = $('#entrada').value.trim();
-  const archivo = $('#foto').files[0];
-  if (!texto && !archivo) return;
-  $('#entrada').value = '';
-  let dataUrl = null;
-  if (archivo) {
-    dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(archivo); });
-    $('#foto').value = '';
-  }
-  preguntar(texto, dataUrl);
+// ---------- caja de escritura ----------
+function ajustarAltura() {
+  entrada.style.height = 'auto';
+  entrada.style.height = Math.min(entrada.scrollHeight, 200) + 'px';
+  if (!controlador) btnEnviar.disabled = !entrada.value.trim() && !fotoPendiente;
+}
+function modoParar(si) {
+  btnEnviar.innerHTML = si ? ICONO_PARAR : ICONO_ENVIAR;
+  btnEnviar.title = si ? 'Detener' : 'Enviar';
+  btnEnviar.disabled = !si && !entrada.value.trim() && !fotoPendiente;
+}
+function quitarFoto() { fotoPendiente = null; $('#foto').value = ''; $('#adjunto').style.display = 'none'; ajustarAltura(); }
+
+$('#envio').addEventListener('submit', ev => { ev.preventDefault(); controlador ? controlador.abort() : enviar(); });
+entrada.addEventListener('input', ajustarAltura);
+entrada.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); if (!controlador) enviar(); }
 });
-
-$('#entrada').addEventListener('keydown', ev => {
-  if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); $('#envio').requestSubmit(); }
+$('#clip').onclick = () => $('#foto').click();
+$('#foto').onchange = () => {
+  const archivo = $('#foto').files[0]; if (!archivo) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    fotoPendiente = fr.result;
+    $('#adjunto img').src = fotoPendiente; $('#adjunto span').textContent = archivo.name;
+    $('#adjunto').style.display = 'flex'; ajustarAltura();
+    // Una foto solo la entiende el modelo de visión: se cambia solo si existe.
+    if ([...selModelo.options].some(o => o.value === 'zuma-vision')) selModelo.value = 'zuma-vision';
+  };
+  fr.readAsDataURL(archivo);
+};
+$('#quitar-foto').onclick = quitarFoto;
+selModelo.onchange = () => { guardado.poner('nucleo_modelo', selModelo.value); if (!actual) bienvenida(); };
+$('#nueva').onclick = () => { abrir(null); entrada.focus(); };
+$('#cerrar-lateral').onclick = () => document.body.classList.add('sin-lateral');
+$('#abrir-lateral').onclick = () => document.body.classList.toggle('sin-lateral');
+document.addEventListener('click', ev => {
+  if (innerWidth <= 800 && !document.body.classList.contains('sin-lateral') && !ev.target.closest('#lateral, #abrir-lateral'))
+    document.body.classList.add('sin-lateral');
 });
+if (innerWidth <= 800) document.body.classList.add('sin-lateral');
 
-$('#limpiar').addEventListener('click', () => { mensajes = []; hilo.innerHTML = ''; });
-
+pintarLista();
+bienvenida();
 cargarModelos();
+entrada.focus();
 </script>
 </body>
 </html>

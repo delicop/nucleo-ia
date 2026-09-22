@@ -8,7 +8,9 @@ pgrep -x ollama >/dev/null || { echo "Ollama apagado, arrancando…"; (nohup oll
 docker compose up -d nucleo-ia
 pgrep -f "http.server 8080" >/dev/null || (cd chat && nohup python3 -m http.server 8080 --bind 127.0.0.1 >/tmp/chat-nucleo.log 2>&1 &)
 
-for _ in $(seq 1 15); do curl -sS -o /dev/null -m 3 http://127.0.0.1:4000/health/liveliness 2>/dev/null && break; sleep 4; done
+listo=0
+for _ in $(seq 1 15); do curl -sS -o /dev/null -m 3 http://127.0.0.1:4000/health/liveliness 2>/dev/null && { listo=1; break; }; sleep 4; done
+[ "$listo" = 1 ] || echo "OJO: el gateway no respondió en 60 s. Mira: docker logs -f nucleo-ia"
 
 echo
 echo "Chat:  http://localhost:8080/?key=$LITELLM_MASTER_KEY"
