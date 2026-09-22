@@ -24,7 +24,8 @@ modelos por API, y cambiarlos no toca el código de los proyectos.
 | Chat de pruebas | Página propia en `chat/index.html`. Open WebUI se descartó: pesado y se colgaba |
 | Modelos locales | Ollama en el host, no en Docker |
 | Servidor de producción | vLLM sobre GPU, porque Ollama no sirve para muchas peticiones a la vez |
-| GPU elegida | RTX A6000 48 GB en RunPod (~0,33 USD/h Community, ~0,53 USD/h Secure) |
+| GPU elegida | **A40 48 GB en RunPod Secure** (0,49 USD/h, ~358 USD/mes 24/7). Casi igual a la A6000 y más barata en Secure. Precios del 2026-09-22 |
+| Dónde corre la GPU | **Por defecto fuera de Colombia (RunPod).** Si una empresa exige servidor en Colombia, se evalúa ese caso (ver "Dónde corre cada cosa") |
 | Enrutador | Por reglas + escalada, NO un modelo que clasifique (ver abajo). Va dentro del backend en Go |
 | Backend | **Go**: un solo binario, poca RAM, bueno para streaming. Decidido el 2026-09-22 |
 | Base de datos | **Postgres** en su propio contenedor, base `nucleo_ia`, volumen de Docker |
@@ -113,6 +114,60 @@ Snowflake apunta a empresas grandes y a analizar volúmenes enormes; ese hueco n
 empresas más grandes y más fuentes de datos. Por eso todo se diseña para poder crecer: más
 GPUs, más proyectos conectados y más empresas sin tocar el código de los proyectos.
 
+## Dónde corre cada cosa (decidido el 2026-09-22)
+
+```
+Colombia (servidor de Zuma)                            Otro país (RunPod)
+┌────────────────────────────────────────┐             ┌─────────────────────┐
+│ Base de Zuma + Postgres de Núcleo IA   │   túnel     │ vLLM (solo la GPU)  │
+│ Backend Go + LiteLLM + memoria + logs  │ ──cifrado──►│ procesa y olvida    │
+└────────────────────────────────────────┘             └─────────────────────┘
+```
+
+- **Todo lo que guarda algo queda en Colombia:** bases, conversaciones, documentos, memoria,
+  logs, backend y LiteLLM. Afuera solo vLLM, que no almacena las peticiones.
+- **Lo que viaja** es el texto de cada pregunta con los datos que el backend sacó para
+  responderla. Se manda solo lo necesario (totales, no tablas completas).
+- **Datos personales ocultos:** el backend cambia nombres, cédulas y teléfonos por códigos
+  (`CLIENTE_17`) antes de enviar, y los devuelve en la respuesta. El modelo nunca ve el dato real.
+- **Túnel cifrado** (WireGuard o TLS) entre Zuma y la GPU, sin puertos abiertos. La latencia
+  Bogotá–EE. UU. (~60–100 ms) no se nota frente al tiempo del modelo.
+- **Argumento de venta honesto:** "Tus datos se guardan en Colombia. La IA los procesa cifrados,
+  sin guardar nada, y nunca ve los datos personales de tus clientes." **No** decir "nada sale de
+  Colombia" mientras la GPU esté afuera.
+- **Legal (confirmar con abogado):** con la Ley 1581, enviar datos personales a un encargado en
+  otro país pide contrato de transmisión y avisarlo en la política de datos. Ocultar los datos
+  personales reduce casi todo el problema.
+
+**Si una empresa exige servidor en Colombia**, se mira caso a caso. Solo cambia `api_base`:
+
+| Opción | Nota |
+|---|---|
+| Servidor propio en un centro de datos de Bogotá (Equinix, HostDime) | Máquina de 2.500–4.000 USD una vez + mensualidad. Lo más barato a mediano plazo |
+| En el servidor de la empresa cliente | Para las que no sacan datos de su edificio. Núcleo IA en Docker se instala igual |
+| Oracle Cloud Bogotá (`sa-bogota-1`) | Única nube grande con región en Colombia. Tiene A10 y L40S, pero en servidores de 4 GPU: varios miles de USD/mes |
+
+No sirven para "datos en Colombia": AWS (en Bogotá solo tiene Direct Connect), DonWeb (vende
+en pesos, pero sus servidores están en Rosario, Argentina). Azure y Google no tienen región aquí.
+
+**RunPod serverless** (A40/A6000 a 1,22 USD/h, solo cobra mientras responde) puede salir más
+barato que la GPU prendida 24/7 mientras haya pocos clientes; la primera pregunta tarda más.
+
+## Cobrar con modelos open source
+
+Se cobra el servicio (plataforma, hosting, conexión con los datos, soporte), y es legal si la
+licencia de cada pieza lo permite:
+
+| Pieza | Licencia | ¿Se puede vender? |
+|---|---|---|
+| Qwen 2.5 de 0,5B / 1,5B / 7B / 14B / 32B, y Qwen 2.5-VL 7B / 32B | Apache 2.0 | Sí |
+| Qwen de 3B y 72B | Licencia propia de Qwen | Leerla antes |
+| Llama | Licencia de Meta | Pide "Built with Llama" y tiene condiciones |
+| vLLM, Ollama, Postgres, pgvector, LiteLLM (parte MIT) | Apache / MIT / PostgreSQL | Sí |
+
+Confirmar la licencia de cada modelo en su página antes de firmar con un cliente: cambian entre
+versiones. Cuenta de ejemplo: A40 Secure + disco ≈ 365 USD/mes; con 8 empresas a 50 USD se cubre.
+
 ## Agentes y roles
 
 Cada proyecto (Zuma y los que vengan) tiene su propio agente. Núcleo IA lo refuerza con
@@ -196,7 +251,7 @@ Conclusión: **el circuito sirve**. La calidad de estos modelos mínimos no, y e
 3. Chat definitivo en React, estilo ChatGPT/Claude, con login.
    Luego: herramientas de Zuma aisladas por empresa, y documentos con pgvector.
 4. Probar en la PC de 48 GB con modelos grandes (`config.yaml`: qwen2.5:7b / 14b / qwen2.5vl:7b).
-5. Alquilar la A6000 por horas y levantar vLLM en vez de Ollama. Solo cambia `api_base`.
+5. Alquilar la A40 por horas y levantar vLLM en vez de Ollama. Solo cambia `api_base`.
 6. Conectar Zuma staging: `DEEPSEEK_BASE_URL` apunta aquí. La visión de Zuma necesita un cambio
    previo, porque tiene la URL fija en `OpenRouterService::OPENROUTER_ENDPOINT`.
 7. Claves virtuales por proyecto con presupuesto, y luego cobro.
