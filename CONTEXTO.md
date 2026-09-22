@@ -47,6 +47,21 @@ El chat propio (`chat/index.html`) hace una sola llamada por mensaje, no pesa na
 el error real cuando algo falla. Para un chat con marca de cara a clientes se puede volver a
 mirar Open WebUI o LibreChat, ya en un servidor con GPU.
 
+## Memoria entre chats
+
+El chat de pruebas guarda las conversaciones en el navegador. Al preguntar, manda en la
+instrucción de sistema lo que el usuario escribió en sus **otras** conversaciones (lo más
+reciente primero, tope de 1.500 caracteres, ~400 tokens). Se apaga con "Recordar otros chats".
+
+- No hace llamadas extra al modelo: en CPU cada llamada extra es otra espera (lo que hundió a
+  Open WebUI).
+- Solo usa los mensajes del usuario: ahí están los datos, y las respuestas ocupan mucho.
+- Probado: sin historial en el chat, `zuma-rapido` y `zuma-chat` respondieron "La Brasa, 12
+  mesas" a partir de la memoria.
+
+Con GPU, lo siguiente sería que el modelo resuma cada conversación y guardar esa memoria en
+Núcleo IA (no en el navegador), para que la tengan todos los proyectos y dispositivos.
+
 ## El enrutador (pendiente de construir)
 
 El proyecto pediría un solo modelo, `zuma`, y Núcleo IA decide:

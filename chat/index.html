@@ -35,6 +35,9 @@
   .conv span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .conv .borrar { opacity:0; color:var(--suave); padding:0 2px; }
   .conv:hover .borrar { opacity:1; }
+  #recordar { font-size:13px; color:var(--suave); cursor:pointer; }
+  #recordar input { accent-color:var(--acento); margin:0; }
+  #recordar small { margin-left:auto; }
   #estado { color:var(--suave); font-size:12px; padding:8px 10px; border-top:1px solid var(--borde); display:flex; align-items:center; gap:8px; }
   #estado::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--suave); flex:none; }
   #estado.ok::before { background:var(--acento); }
@@ -125,6 +128,9 @@
     Nueva conversación
   </button>
   <div id="lista"></div>
+  <label class="fila" id="recordar" title="Cada chat nuevo recibe un resumen de lo que escribiste en los otros">
+    <input type="checkbox" id="usar-memoria"> Recordar otros chats <small></small>
+  </label>
   <div id="estado">conectando…</div>
 </aside>
 
@@ -182,8 +188,34 @@ let controlador = null;       // AbortController de la respuesta en curso
 
 // Los modelos chicos suelen contestar "no puedo recordar conversaciones" aunque tengan el
 // historial delante; esto les recuerda que sí lo tienen.
-const SISTEMA = { role: 'system', content: 'Eres el asistente de Núcleo IA. Responde siempre en español. ' +
-  'Tienes delante toda la conversación anterior, aunque parte la haya respondido otro modelo: úsala para responder.' };
+const BASE = 'Eres el asistente de Núcleo IA. Responde siempre en español. ' +
+  'Tienes delante toda la conversación anterior, aunque parte la haya respondido otro modelo: úsala para responder.';
+
+// Memoria entre chats: lo que el usuario escribió en sus OTRAS conversaciones, de la más
+// reciente a la más vieja, hasta un tope. No hace llamadas extra al modelo (en CPU cada
+// llamada extra es una espera más); solo se usan los mensajes del usuario porque ahí
+// están los datos (nombres, cifras, gustos) y las respuestas del modelo ocupan mucho.
+const TOPE_MEMORIA = 1500;    // caracteres, ~400 tokens: los modelos del portátil tienen 4096
+function memoria() {
+  if (!$('#usar-memoria').checked) return '';
+  const lineas = []; let usado = 0;
+  for (const c of [...convs].sort((a, b) => b.fecha - a.fecha)) {
+    if (c === actual) continue;
+    const dichos = c.mensajes.filter(m => m.role === 'user' && m.content).map(m => m.content.replace(/\s+/g, ' ').slice(0, 200));
+    if (!dichos.length) continue;
+    const dia = new Date(c.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+    let linea = `- «${c.titulo}» (${dia}): ${dichos.join(' · ')}`;
+    if (usado + linea.length > TOPE_MEMORIA) linea = linea.slice(0, TOPE_MEMORIA - usado);
+    if (linea.length < 40) break;
+    lineas.push(linea); usado += linea.length;
+  }
+  return lineas.length ? '\n\nMemoria: esto es lo que el usuario escribió en otras conversaciones contigo. ' +
+    'Úsalo si viene al caso; si no, ignóralo y no lo menciones.\n' + lineas.join('\n') : '';
+}
+function pintarMemoria() {
+  const n = convs.filter(c => c !== actual && c.mensajes.length).length;
+  $('#recordar small').textContent = $('#usar-memoria').checked && n ? n + (n === 1 ? ' chat' : ' chats') : '';
+}
 
 // ---------- markdown mínimo ----------
 const esc = s => s.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -283,6 +315,7 @@ function abrir(conv) {
 }
 
 function pintarLista() {
+  pintarMemoria();
   const lista = $('#lista'); lista.innerHTML = '';
   const hoy = new Date().toDateString();
   let grupo = null;
@@ -359,7 +392,7 @@ async function enviar() {
     const r = await fetch(API + '/v1/chat/completions', {
       method: 'POST', signal: controlador.signal,
       headers: { Authorization: 'Bearer ' + CLAVE, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modelo, messages: [SISTEMA, ...historial, { role: 'user', content: contenido }], stream: true })
+      body: JSON.stringify({ model: modelo, messages: [{ role: 'system', content: BASE + memoria() }, ...historial, { role: 'user', content: contenido }], stream: true })
     });
     if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + (await r.text()).slice(0, 200));
 
@@ -433,6 +466,8 @@ $('#foto').onchange = () => {
   fr.readAsDataURL(archivo);
 };
 $('#quitar-foto').onclick = quitarFoto;
+$('#usar-memoria').checked = guardado.leer('nucleo_memoria', true);
+$('#usar-memoria').onchange = () => { guardado.poner('nucleo_memoria', $('#usar-memoria').checked); pintarMemoria(); };
 selModelo.onchange = () => { guardado.poner('nucleo_modelo', selModelo.value); if (!actual) bienvenida(); };
 $('#nueva').onclick = () => { abrir(null); entrada.focus(); };
 $('#cerrar-lateral').onclick = () => document.body.classList.add('sin-lateral');
