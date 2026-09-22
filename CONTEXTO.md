@@ -80,3 +80,23 @@ para análisis, no para operar) y de ahí la idea de tener plataforma propia.
 
 El repo de Zuma está en `~/Saas-Restaurante`. Los documentos de los agentes viven en
 `docs/agentes/` de ese repo; aquí se copiaron los tres que describen la plataforma.
+
+## Pendiente: el chat del navegador no respondía (2026-09-22)
+
+Estado al cerrar la sesión. Lo verificado:
+
+- El gateway responde bien: una petición normal tarda **3,3 s** y el streaming entrega trozos.
+- La página se sirve (`http.server` en el 8080) y el gateway acepta CORS desde ese origen.
+- **La máquina está saturada:** carga 9,4 con 4 núcleos y ~200 MB de RAM libre, con los dos
+  modelos cargados a la vez en CPU. Esa es la sospecha principal de la lentitud.
+
+Para retomar:
+
+1. Abrir la consola del navegador (F12 → Console y Network) y ver qué dice la petición a
+   `localhost:4000`. Ahí se sabe si es CORS, la clave o simple lentitud.
+2. Confirmar que la URL lleva `?key=...` (la clave está en `.env`).
+3. `ollama stop qwen2.5:1.5b` para dejar un solo modelo cargado, y probar con `zuma-rapido`.
+4. Si sigue lento: es la CPU. Pasar a la PC de 48 GB (`CONFIG_FILE=config.yaml`) o alquilar la
+   GPU por horas.
+
+`./arrancar.sh` levanta todo e imprime el link del chat con la clave ya puesta.
