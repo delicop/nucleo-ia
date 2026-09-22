@@ -28,6 +28,7 @@ modelos por API, y cambiarlos no toca el código de los proyectos.
 | Enrutador | Por reglas + escalada, NO un modelo que clasifique (ver abajo). Va dentro del backend en Go |
 | Backend | **Go**: un solo binario, poca RAM, bueno para streaming. Decidido el 2026-09-22 |
 | Base de datos | **Postgres** en su propio contenedor, base `nucleo_ia`, volumen de Docker |
+| Documentos de la empresa | **pgvector** en el mismo Postgres + un modelo de embeddings local. Se busca solo lo relevante |
 | Chat definitivo | **React + Vite**, compilado y embebido en el binario de Go. Estilo ChatGPT/Claude, marca Núcleo IA |
 
 ## Por qué no Open WebUI
@@ -89,6 +90,64 @@ Navegador ──► Backend Go (chat + API + memoria + enrutador) ──► Lite
 
 `chat/index.html` queda como chat de pruebas hasta que el nuevo lo reemplace.
 
+## Hacia dónde apunta
+
+Lo que hace Snowflake con su IA (datos de la empresa + IA en el mismo lugar, con permisos),
+pero **open source, local y a la medida de empresas medianas**: los datos se quedan en el
+servidor de Zuma, la IA corre en nuestra GPU con modelos gratuitos, y cada empresa solo ve lo
+suyo. No se paga Claude, OpenAI ni Snowflake.
+
+| Snowflake | Núcleo IA (open source) |
+|---|---|
+| Almacén de datos | La base de Zuma (ya existe) + Postgres de Núcleo IA |
+| Buscar en documentos | pgvector + modelo de embeddings local |
+| Preguntar por los datos | Herramientas de solo lectura de Zuma |
+| Modelos | Qwen y otros abiertos en vLLM, sobre GPU propia |
+| Permisos y gobierno | El backend en Go filtra todo por empresa |
+
+## Agentes y roles
+
+Cada proyecto (Zuma y los que vengan) tiene su propio agente. Núcleo IA lo refuerza con
+varios modelos que se turnan según lo que pida la persona, **compartiendo el mismo contexto**
+(la conversación vive en Postgres, no en ningún modelo).
+
+```
+Persona ──► Agente del proyecto ──► Núcleo IA (coordinador)
+                                        │  contexto compartido, por empresa
+                                        ├─ Consultar  → herramientas de lectura del proyecto
+                                        ├─ Hacer      → acciones internas, con confirmación
+                                        ├─ Guardar    → memoria de la empresa, texto exacto
+                                        ├─ Extraer    → el dato o reporte que pida la empresa
+                                        ├─ Documentos → busca en los documentos de la empresa
+                                        └─ Ver imagen → modelo de visión
+```
+
+- **Un coordinador decide qué rol entra**, con reglas. Las IA no conversan libremente entre
+  ellas: con modelos medianos eso se desordena y falla más.
+- **El aislamiento lo impone el backend, no la IA.** Conversaciones, memoria, documentos y
+  herramientas se filtran por la empresa de la clave. Aunque un modelo se confunda o lo
+  intenten engañar, el backend nunca le da datos de otra empresa.
+- **La IA no lee la base con SQL libre.** Usa herramientas de solo lectura del proyecto (como
+  `inventario_critico`). Los números salen de la base; el modelo solo los explica.
+- **Lo que escribe pide confirmación** (cambiar inventario, crear pedidos, borrar).
+
+## Documentos de la empresa (RAG)
+
+La empresa sube sus documentos (PDF, Word, Excel, fotos de papeles) y el chat responde con
+ellos. **No se le manda todo al modelo en cada pregunta**: eso gastaría miles de tokens y no
+cabría. El flujo es:
+
+1. **Al subir:** se extrae el texto (los escaneados, con el modelo de visión), se parte en
+   trozos de ~1 página y cada trozo se guarda con su "huella" (embedding) en pgvector, marcado
+   con la empresa.
+2. **Al preguntar:** se busca en los documentos **de esa empresa** los ~5 trozos más
+   parecidos a la pregunta, y solo esos van al modelo (~2.000 tokens), con la fuente citada.
+
+- El modelo de embeddings es chico (ej. `bge-m3`, multilingüe) y corre incluso en CPU: sería el
+  3.º o 4.º modelo del servidor.
+- Sin inventar: la respuesta cita de qué documento sale; si no está, lo dice.
+- Va en el mismo Postgres, así que no suma otra base de datos.
+
 ## El enrutador (pendiente de construir)
 
 El proyecto pediría un solo modelo, `zuma`, y Núcleo IA decide:
@@ -127,6 +186,7 @@ Conclusión: **el circuito sirve**. La calidad de estos modelos mínimos no, y e
 1. Construir el backend en Go + Postgres (ver "Backend y base de datos").
 2. Construir el enrutador por reglas dentro del backend (modelo único `zuma`).
 3. Chat definitivo en React, estilo ChatGPT/Claude, con login.
+   Luego: herramientas de Zuma aisladas por empresa, y documentos con pgvector.
 4. Probar en la PC de 48 GB con modelos grandes (`config.yaml`: qwen2.5:7b / 14b / qwen2.5vl:7b).
 5. Alquilar la A6000 por horas y levantar vLLM en vez de Ollama. Solo cambia `api_base`.
 6. Conectar Zuma staging: `DEEPSEEK_BASE_URL` apunta aquí. La visión de Zuma necesita un cambio
