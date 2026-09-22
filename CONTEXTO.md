@@ -105,6 +105,14 @@ suyo. No se paga Claude, OpenAI ni Snowflake.
 | Modelos | Qwen y otros abiertos en vLLM, sobre GPU propia |
 | Permisos y gobierno | El backend en Go filtra todo por empresa |
 
+**Nicho (decidido el 2026-09-22):** empresas medianas, empezando por los clientes de Zuma, que
+quieren preguntarle a su negocio en lenguaje normal, con privacidad y sin pagar licencias caras.
+Snowflake apunta a empresas grandes y a analizar volúmenes enormes; ese hueco no lo cubre bien.
+
+**Ambición:** empezar por ese nicho sin cerrarse a más. Si funciona, se intenta crecer hacia
+empresas más grandes y más fuentes de datos. Por eso todo se diseña para poder crecer: más
+GPUs, más proyectos conectados y más empresas sin tocar el código de los proyectos.
+
 ## Agentes y roles
 
 Cada proyecto (Zuma y los que vengan) tiene su propio agente. Núcleo IA lo refuerza con
