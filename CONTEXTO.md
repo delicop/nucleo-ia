@@ -25,7 +25,10 @@ modelos por API, y cambiarlos no toca el código de los proyectos.
 | Modelos locales | Ollama en el host, no en Docker |
 | Servidor de producción | vLLM sobre GPU, porque Ollama no sirve para muchas peticiones a la vez |
 | GPU elegida | RTX A6000 48 GB en RunPod (~0,33 USD/h Community, ~0,53 USD/h Secure) |
-| Enrutador | Por reglas + escalada, NO un modelo que clasifique (ver abajo) |
+| Enrutador | Por reglas + escalada, NO un modelo que clasifique (ver abajo). Va dentro del backend en Go |
+| Backend | **Go**: un solo binario, poca RAM, bueno para streaming. Decidido el 2026-09-22 |
+| Base de datos | **Postgres** en su propio contenedor, base `nucleo_ia`, volumen de Docker |
+| Chat definitivo | **React + Vite**, compilado y embebido en el binario de Go. Estilo ChatGPT/Claude, marca Núcleo IA |
 
 ## Por qué no Open WebUI
 
@@ -59,8 +62,32 @@ reciente primero, tope de 1.500 caracteres, ~400 tokens). Se apaga con "Recordar
 - Probado: sin historial en el chat, `zuma-rapido` y `zuma-chat` respondieron "La Brasa, 12
   mesas" a partir de la memoria.
 
-Con GPU, lo siguiente sería que el modelo resuma cada conversación y guardar esa memoria en
-Núcleo IA (no en el navegador), para que la tengan todos los proyectos y dispositivos.
+Lo siguiente es guardarla en Postgres, en Núcleo IA y no en el navegador, para que la tengan
+todos los proyectos y dispositivos (ver "Backend y base de datos").
+
+## Backend y base de datos (decidido, por construir)
+
+```
+Navegador ──► Backend Go (chat + API + memoria + enrutador) ──► LiteLLM ──► Ollama / vLLM
+                        │
+                        └──► Postgres (usuarios, conversaciones, mensajes)
+```
+
+- **Todo queda guardado:** conversaciones y mensajes en Postgres, con volumen de Docker. Sobrevive
+  a cerrar el chat, apagar Docker o reiniciar. Solo se borra con `docker compose down -v`.
+- **Sin inventar:** se guarda el texto exacto de cada mensaje, y la memoria entre chats se arma
+  con ese texto literal. Ningún modelo resume ni reescribe lo guardado.
+- **Usuarios con login:** la memoria es de cada usuario, no una para todos.
+- **Un solo contenedor** para el backend: sirve el chat (React compilado) y la API en el mismo
+  puerto. El backend le habla a LiteLLM por HTTP.
+- **Postgres propio**, aparte de los otros Postgres de la máquina, en un puerto libre y solo en
+  `127.0.0.1`. La misma base le sirve después a LiteLLM para claves por proyecto y gastos.
+- **Copia de seguridad:** el volumen no es respaldo; hace falta un `pg_dump` periódico.
+- Funciones a llegar (como ChatGPT/Claude): editar un mensaje y regenerar, renombrar y buscar
+  conversaciones, código con colores y botón de copiar.
+- Quien mantenga el backend necesita saber Go.
+
+`chat/index.html` queda como chat de pruebas hasta que el nuevo lo reemplace.
 
 ## El enrutador (pendiente de construir)
 
@@ -74,7 +101,7 @@ El proyecto pediría un solo modelo, `zuma`, y Núcleo IA decide:
 | El rápido falla o no puede | Reintenta en `zuma-chat` (escalada) |
 
 No se usa el enrutador automático de LiteLLM: está en beta y el semántico quedó descontinuado.
-Serían unas 60 líneas en Python, del lado de Núcleo IA, no dentro de Zuma.
+Serían unas 60 líneas en Go, dentro del backend de Núcleo IA, no dentro de Zuma.
 
 ## Estado actual (2026-09-22)
 
@@ -97,12 +124,14 @@ Conclusión: **el circuito sirve**. La calidad de estos modelos mínimos no, y e
 
 ## Lo que sigue
 
-1. Construir el enrutador por reglas (modelo único `zuma`).
-2. Probar en la PC de 48 GB con modelos grandes (`config.yaml`: qwen2.5:7b / 14b / qwen2.5vl:7b).
-3. Alquilar la A6000 por horas y levantar vLLM en vez de Ollama. Solo cambia `api_base`.
-4. Conectar Zuma staging: `DEEPSEEK_BASE_URL` apunta aquí. La visión de Zuma necesita un cambio
+1. Construir el backend en Go + Postgres (ver "Backend y base de datos").
+2. Construir el enrutador por reglas dentro del backend (modelo único `zuma`).
+3. Chat definitivo en React, estilo ChatGPT/Claude, con login.
+4. Probar en la PC de 48 GB con modelos grandes (`config.yaml`: qwen2.5:7b / 14b / qwen2.5vl:7b).
+5. Alquilar la A6000 por horas y levantar vLLM en vez de Ollama. Solo cambia `api_base`.
+6. Conectar Zuma staging: `DEEPSEEK_BASE_URL` apunta aquí. La visión de Zuma necesita un cambio
    previo, porque tiene la URL fija en `OpenRouterService::OPENROUTER_ENDPOINT`.
-5. Claves virtuales por proyecto con presupuesto, y luego cobro.
+7. Claves virtuales por proyecto con presupuesto, y luego cobro.
 
 ## Historia corta
 
@@ -116,27 +145,11 @@ para análisis, no para operar) y de ahí la idea de tener plataforma propia.
 El repo de Zuma está en `~/Saas-Restaurante`. Los documentos de los agentes viven en
 `docs/agentes/` de ese repo; aquí se copiaron los tres que describen la plataforma.
 
-## Pendiente: el chat del navegador no respondía (2026-09-22)
+## Resuelto: el chat del navegador no respondía (2026-09-22)
 
-Estado al cerrar la sesión. Lo verificado:
-
-- El gateway responde bien: una petición normal tarda **3,3 s** y el streaming entrega trozos.
-- La página se sirve (`http.server` en el 8080) y el gateway acepta CORS desde ese origen.
-- **La máquina está saturada:** carga 9,4 con 4 núcleos y ~200 MB de RAM libre, con los dos
-  modelos cargados a la vez en CPU. Esa es la sospecha principal de la lentitud.
-
-Para retomar:
-
-1. Abrir la consola del navegador (F12 → Console y Network) y ver qué dice la petición a
-   `localhost:4000`. Ahí se sabe si es CORS, la clave o simple lentitud.
-2. Confirmar que la URL lleva `?key=...` (la clave está en `.env`).
-3. `ollama stop qwen2.5:1.5b` para dejar un solo modelo cargado, y probar con `zuma-rapido`.
-4. Si sigue lento: es la CPU. Pasar a la PC de 48 GB (`CONFIG_FILE=config.yaml`) o alquilar la
-   GPU por horas.
+El gateway y el CORS estaban bien. El chat mostraba "sin conexión" para cualquier error y la
+máquina estaba saturada (dos modelos cargados y 12 contenedores de otros proyectos). El chat
+ahora muestra el error real y responde en ~1 s con `zuma-rapido`. En el portátil: apagar los
+otros contenedores antes de probar.
 
 `./arrancar.sh` levanta todo e imprime el link del chat con la clave ya puesta.
-
-Actualización: el gateway y el CORS se verificaron bien (streaming en 0,6 s). El chat ahora
-muestra si falta la clave o si es rechazada, en vez de "sin conexión", y muestra los errores
-que llegan dentro del stream. Además había 12 contenedores de otros proyectos prendidos en el
-portátil: apagarlos antes de probar.
