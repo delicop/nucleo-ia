@@ -1,0 +1,21 @@
+# PC de 48 GB: tres modelos reales prendidos a la vez.
+model_list:
+  - model_name: zuma-rapido      # preguntas cortas, jobs, clasificar
+    litellm_params:
+      model: ollama_chat/qwen2.5:7b
+      api_base: http://127.0.0.1:11434
+  - model_name: zuma-chat        # el agente Gerente, usa herramientas
+    litellm_params:
+      model: ollama_chat/qwen2.5:14b
+      api_base: http://127.0.0.1:11434
+  - model_name: zuma-vision      # foto de bodega y facturas
+    litellm_params:
+      model: ollama_chat/qwen2.5vl:7b
+      api_base: http://127.0.0.1:11434
+
+router_settings:
+  fallbacks:
+    - zuma-chat: [zuma-rapido]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

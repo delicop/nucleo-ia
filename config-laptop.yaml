@@ -1,0 +1,22 @@
+# Portatil sin GPU: los modelos MAS chicos que hay. Solo para ver que el
+# circuito funciona; la calidad no sirve para produccion.
+model_list:
+  - model_name: zuma-rapido
+    litellm_params:
+      model: ollama_chat/qwen2.5:0.5b      # ~400 MB
+      api_base: http://127.0.0.1:11434
+  - model_name: zuma-chat
+    litellm_params:
+      model: ollama_chat/qwen2.5:1.5b      # ~1 GB, aguanta herramientas
+      api_base: http://127.0.0.1:11434
+  - model_name: zuma-vision
+    litellm_params:
+      model: ollama_chat/moondream         # ~1.7 GB, el mas chico que ve imagenes
+      api_base: http://127.0.0.1:11434
+
+router_settings:
+  fallbacks:
+    - zuma-chat: [zuma-rapido]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
